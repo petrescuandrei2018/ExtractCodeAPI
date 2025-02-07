@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using ExtractCodeAPI.DTOs;
+using ExtractCodeAPI.Services.Facade;
+using ExtractCodeAPI.Services.Abstractions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using ExtractCodeAPI.Services;
-using ExtractCodeAPI.DTOs;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -14,18 +15,24 @@ namespace ExtractCodeAPI.Controllers
     public class ExtractController : ControllerBase
     {
         private readonly ILogger<ExtractController> _logger;
-        private readonly FileService _fileService;
-        private readonly ExtractService _extractService;
+        private readonly IFileService _fileService;
+        private readonly IExtractFacade _extractFacade;
+        private readonly IFileDownloadService _fileDownloadService;
 
-        public ExtractController(ILogger<ExtractController> logger, FileService fileService, ExtractService extractService)
+        public ExtractController(
+            ILogger<ExtractController> logger,
+            IFileService fileService,
+            IExtractFacade extractFacade,
+            IFileDownloadService fileDownloadService)
         {
             _logger = logger;
             _fileService = fileService;
-            _extractService = extractService;
+            _extractFacade = extractFacade;
+            _fileDownloadService = fileDownloadService;
         }
 
         /// <summary>
-        /// ✅ Încarcă arhiva și procesează extragerea codului sursă.
+        /// ✅ Încarcă arhiva și procesează extragerea codului sursă
         /// </summary>
         [HttpPost("upload")]
         [Consumes("multipart/form-data")]
@@ -40,17 +47,9 @@ namespace ExtractCodeAPI.Controllers
             try
             {
                 string archivePath = await _fileService.SaveFileAsync(uploadDto.File);
-                string extractFolder = await _extractService.ExtractArchiveAsync(archivePath);
-                string outputFile = await _extractService.GenerateCodeFileAsync(extractFolder);
+                string outputFile = await _extractFacade.ProcessFileAsync(archivePath);
 
-                // Returnăm link-ul de descărcare doar dacă fișierul nu este gol.
-                if (new FileInfo(outputFile).Length == 0)
-                {
-                    _logger.LogError("⚠ Fișierul generat este gol.");
-                    return BadRequest("Fișierul generat este gol.");
-                }
-
-                return Ok(new { message = "Fișier procesat cu succes!", downloadUrl = "/api/extract/download" });
+                return Ok(new { message = "Fișier procesat cu succes!", downloadUrl = $"/api/extract/download" });
             }
             catch (Exception ex)
             {
@@ -60,7 +59,7 @@ namespace ExtractCodeAPI.Controllers
         }
 
         /// <summary>
-        /// ✅ Descarcă fișierul text generat.
+        /// ✅ Descarcă fișierul text generat
         /// </summary>
         [HttpGet("download")]
         public IActionResult DownloadExtractedCode()
@@ -73,8 +72,8 @@ namespace ExtractCodeAPI.Controllers
                 return NotFound("Fișierul nu există. Încarcă mai întâi un proiect!");
             }
 
-            var stream = new FileStream(outputFile, FileMode.Open, FileAccess.Read);
-            return File(stream, "text/plain", "export_cod.txt");
+            byte[] fileContents = _fileDownloadService.GetFileContents(outputFile);
+            return File(fileContents, "application/octet-stream", "export_cod.txt");
         }
     }
 }

@@ -1,51 +1,56 @@
-﻿using Microsoft.OpenApi.Models;
-using ExtractCodeAPI.Services;
+﻿using ExtractCodeAPI.Factory;
+using ExtractCodeAPI.Services.Abstractions;
+using ExtractCodeAPI.Services.Facade;
+using ExtractCodeAPI.Services.Implementations;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ✅ Adăugăm serviciile necesare
+// ✅ Adăugăm suport pentru controlere
 builder.Services.AddControllers();
+
+// ✅ Configurare Swagger
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddSwaggerGen(options =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
+    options.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "Extract Code API",
+        Title = "ExtractCodeAPI",
         Version = "v1",
-        Description = "API pentru extragerea codului sursă din arhive ZIP",
-        Contact = new OpenApiContact
-        {
-            Name = "Suport",
-            Email = "suport@example.com",
-            Url = new Uri("https://github.com")
-        }
+        Description = "API pentru extracția și procesarea fișierelor cod sursă din arhive"
     });
 });
 
-// ✅ Adăugăm serviciile noastre
-builder.Services.AddSingleton<FileService>();
-builder.Services.AddSingleton<ExtractService>();
-builder.Services.AddSingleton<LogService>();
+// ✅ Înregistrare servicii și factory
+builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<IFileExtractionService, FileExtractionService>();
+builder.Services.AddScoped<ICodeGenerationService, CodeGenerationService>();
+builder.Services.AddScoped<IFileDownloadService, FileDownloadService>();
+builder.Services.AddSingleton<ILogService, LogService>();
+builder.Services.AddSingleton<FileValidatorService>();
+
+// ✅ Înregistrăm `ExtractFacade` cu interfața sa (ACUM ESTE CORECT)
+builder.Services.AddScoped<IExtractFacade, ExtractFacade>();
+
+builder.Services.AddScoped<IServiceFactory, ServiceFactory>();
+builder.Services.AddScoped<IArchiveExtractor, ZipExtractor>();
 
 var app = builder.Build();
 
-// ✅ Activăm Swagger doar în Development
+// ✅ Activăm Swagger
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c =>
+    app.UseSwaggerUI(options =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Extract Code API v1");
-        c.RoutePrefix = string.Empty;
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "ExtractCodeAPI v1");
+        options.RoutePrefix = ""; // ✅ Face ca Swagger să fie pagina implicită
     });
 }
 
+// ✅ Middleware-uri corecte
 app.UseHttpsRedirection();
-app.UseAuthorization();
+app.UseRouting();
 app.MapControllers();
-
-// ✅ Log după pornirea aplicației
-Console.WriteLine("✅ API-ul rulează la: https://localhost:7033");
-Console.WriteLine("✅ Poți accesa Swagger la: https://localhost:7033/swagger");
 
 app.Run();
