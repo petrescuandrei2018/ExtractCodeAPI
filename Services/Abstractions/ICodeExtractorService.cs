@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 
 namespace ExtractCodeAPI.Services.Abstractions
 {
-    public interface IExtractFacade
+    public interface ICodeExtractorService
     {
-        Task<Dictionary<string, string>> ExtractCodeFromArchive(Stream archiveStream);
+        Task<Dictionary<string, string>> ExtractCodeFromArchive(Stream zipStream);
     }
 }

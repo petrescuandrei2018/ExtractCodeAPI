@@ -10,6 +10,7 @@
     <PackageReference Include="iTextSharp" Version="5.5.13.4" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.1" />
     <PackageReference Include="SevenZipExtractor" Version="1.0.19" />
+    <PackageReference Include="SharpCompress" Version="0.39.0" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
   </ItemGroup>

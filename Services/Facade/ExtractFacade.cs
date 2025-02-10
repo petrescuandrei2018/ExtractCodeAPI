@@ -1,33 +1,22 @@
-﻿using ExtractCodeAPI.Services.Abstractions;
+﻿using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
+using ExtractCodeAPI.Services.Abstractions;
 
 namespace ExtractCodeAPI.Services.Facade
 {
     public class ExtractFacade : IExtractFacade
     {
-        private readonly IFileService _fileService;
-        private readonly IFileExtractionService _fileExtractionService;
-        private readonly ICodeGenerationService _codeGenerationService;
+        private readonly ICodeExtractorService _codeExtractorService;
 
-        public ExtractFacade(
-            IFileService fileService,
-            IFileExtractionService fileExtractionService,
-            ICodeGenerationService codeGenerationService)
+        public ExtractFacade(ICodeExtractorService codeExtractorService)
         {
-            _fileService = fileService;
-            _fileExtractionService = fileExtractionService;
-            _codeGenerationService = codeGenerationService;
+            _codeExtractorService = codeExtractorService;
         }
 
-        public async Task<string> ProcessFileAsync(string archivePath)
+        public async Task<Dictionary<string, string>> ExtractCodeFromArchive(Stream archiveStream)
         {
-            // ✅ Extrage fișierul din arhivă
-            string extractFolder = await _fileExtractionService.ExtractArchiveAsync(archivePath);
-
-            // ✅ Generează fișierul de cod din extragere
-            string outputFile = await _codeGenerationService.GenerateCodeFileAsync(extractFolder);
-
-            return outputFile;
+            return await _codeExtractorService.ExtractCodeFromArchive(archiveStream);
         }
     }
 }
