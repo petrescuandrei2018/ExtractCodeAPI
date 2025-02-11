@@ -9,7 +9,8 @@ using ExtractCodeAPI.Services.Facade;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System.ComponentModel.DataAnnotations; 
+using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 
 
 namespace ExtractCodeAPI.Controllers
@@ -34,72 +35,62 @@ namespace ExtractCodeAPI.Controllers
         [HttpPost("upload")]
         [RequestSizeLimit(5L * 1024 * 1024 * 1024)]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> UploadArchive([Required]IFormFile file)
+        public async Task<IActionResult> UploadArchive([Required] IFormFile file)
         {
             if (file == null || file.Length == 0)
             {
-                Console.WriteLine("❌ Niciun fișier selectat!");
-                Console.Out.Flush();  // ✅ Forțează afișarea în consolă
-                return BadRequest(new
-                {
-                    message = "Trebuie să selectezi un fișier arhivat pentru a continua."
-                });
+                return BadRequest(new { message = "Trebuie să selectezi un fișier arhivat pentru a continua." });
             }
 
             try
             {
-                Console.WriteLine($"📂 Fișier primit: {file.FileName}, mărime: {file.Length / (1024 * 1024)} MB");
-                Console.Out.Flush();  // ✅ Forțează afișarea în consolă
-
                 string tempFilePath = Path.Combine(Path.GetTempPath(), file.FileName);
 
-                using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
-                using (var inputStream = file.OpenReadStream())
+                Stopwatch uploadTimer = Stopwatch.StartNew(); // 🔹 Pornim timerul pentru încărcare
+
+                using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
-                    Console.WriteLine("⏳ Salvăm fișierul temporar...");
-                    Console.Out.Flush();  // ✅ Forțează afișarea în consolă
-                    await CopyStreamWithProgress(inputStream, fileStream, file.Length);
+                    await file.CopyToAsync(fileStream);
                 }
 
-                Console.WriteLine($"\n✅ Fișier salvat la: {tempFilePath}");
-                Console.Out.Flush();  // ✅ Forțează afișarea în consolă
+                uploadTimer.Stop(); // 🔹 Oprim timerul
+                Console.WriteLine($"✅ Upload finalizat în {uploadTimer.Elapsed.TotalSeconds:F2} secunde!");
 
-                using (var archiveStream = new FileStream(tempFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, true))
+                using (var archiveStream = new FileStream(tempFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
-                    Console.WriteLine("🚀 Începem extragerea fișierelor...");
-                    Console.Out.Flush();  // ✅ Forțează afișarea în consolă
+                    Console.WriteLine("🚀 Începem extracția fișierelor...");
+
+                    Stopwatch extractTimer = Stopwatch.StartNew(); // 🔹 Pornim timerul pentru extracție
 
                     var extractedCode = await _extractFacade.ExtractCodeFromArchive(archiveStream);
+
+                    extractTimer.Stop(); // 🔹 Oprim timerul
+                    Console.WriteLine($"✅ Extracție finalizată în {extractTimer.Elapsed.TotalSeconds:F2} secunde!");
+
                     if (extractedCode.Count == 0)
                     {
-                        Console.WriteLine("⚠ Nu s-au găsit fișiere de cod sursă valide!");
-                        Console.Out.Flush();
                         return BadRequest("Nu s-au găsit fișiere de cod sursă valide.");
                     }
 
                     string outputFile = Path.Combine(Path.GetTempPath(), "export_cod.txt");
+
                     using (var writer = new StreamWriter(outputFile, false, Encoding.UTF8))
                     {
                         foreach (var (fileName, content) in extractedCode)
                         {
                             writer.WriteLine(content);
-                            Console.WriteLine($"📝 Fișier scris: {fileName}");
-                            Console.Out.Flush();  // ✅ Forțează afișarea în consolă
                         }
                     }
 
-                    Console.WriteLine($"✅ Fișierele de cod salvate în: {outputFile}");
-                    Console.Out.Flush();  // ✅ Forțează afișarea în consolă
                     return Ok(new { message = "Fișierele de cod sursă au fost extrase!", downloadUrl = "/api/extract/download" });
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Eroare: {ex.Message}");
-                Console.Out.Flush();  // ✅ Forțează afișarea în consolă
                 return StatusCode(500, $"Eroare internă: {ex.Message}");
             }
         }
+
 
 
 

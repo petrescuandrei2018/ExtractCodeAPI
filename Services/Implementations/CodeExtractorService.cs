@@ -16,14 +16,26 @@ namespace ExtractCodeAPI.Services.Implementations
 
         public async Task<Dictionary<string, string>> ExtractCodeFromArchive(Stream archiveStream)
         {
+            if (archiveStream == null || archiveStream.Length == 0)
+            {
+                throw new InvalidOperationException("❌ Fișierul încărcat este gol sau invalid.");
+            }
+
+            archiveStream.Position = 0; // 🔄 Resetează stream-ul înainte de citire
+
             string tempFolder = Path.Combine(Path.GetTempPath(), $"extracted_{Guid.NewGuid()}");
             Directory.CreateDirectory(tempFolder);
             var extractedCode = new Dictionary<string, string>();
 
             try
             {
-                using (var archive = ArchiveFactory.Open(archiveStream))
+                using (var archive = OpenArchiveSafely(archiveStream))
                 {
+                    if (archive == null || !archive.Entries.Any())
+                    {
+                        throw new InvalidOperationException("❌ Arhiva nu conține fișiere valide sau este coruptă.");
+                    }
+
                     int totalFiles = archive.Entries.Count(entry => !entry.IsDirectory && AllowedExtensions.Contains(Path.GetExtension(entry.Key)));
                     int processedFiles = 0;
 
@@ -60,12 +72,31 @@ namespace ExtractCodeAPI.Services.Implementations
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Eroare la procesarea arhivei: {ex.Message}");
+                throw;
+            }
             finally
             {
                 Directory.Delete(tempFolder, true);
             }
 
             return extractedCode;
+        }
+
+        // ✅ Funcție sigură pentru deschiderea arhivelor
+        private IArchive OpenArchiveSafely(Stream archiveStream)
+        {
+            try
+            {
+                return ArchiveFactory.Open(archiveStream);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Eroare la deschiderea arhivei: {ex.Message}");
+                return null;
+            }
         }
 
         // 📊 Funcție pentru progress bar
@@ -75,6 +106,7 @@ namespace ExtractCodeAPI.Services.Implementations
             int progress = (int)((double)current / total * barLength);
             string progressBar = new string('█', progress) + new string('-', barLength - progress);
             Console.Write($"\r[{progressBar}] {current}/{total} fișiere procesate");
+            Console.Out.Flush();
         }
     }
 }
